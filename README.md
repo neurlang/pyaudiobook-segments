@@ -15,7 +15,7 @@ text and duration in `.parquet`.
 
 ## Before you `run.sh`
 
-0. Install ffmpeg, uv
+0. Install `ffmpeg`, `uv`
 1. Customize `LANGUAGE` in `jsons.py` (based on your audiobook language)
 2. Customize `ALLOWED` character set in `pack.py`
 
