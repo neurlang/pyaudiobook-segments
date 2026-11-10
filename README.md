@@ -10,8 +10,8 @@ Python Audio Book Segments Cutting for ML training
 **Solution**: You need to create a hugging face dataset for ASR training.
 You run `./run.sh` and a two parquet directories will be generated with
 segmented audio and texts: `train/` and `dev/` shard ready for hugging face.
-Each audio will have 16Khz and be mono FLAC, less than 30s, with corresponding
-text and duration in `.parquet`.
+Each audio in `.parquet` will have 16Khz and be mono FLAC, less than 30s, with
+corresponding text and duration in `.parquet` as well.
 
 ## Before you `run.sh`
 
