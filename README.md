@@ -18,6 +18,7 @@ corresponding text and duration in `.parquet` as well.
 0. Install `ffmpeg`, `uv`
 1. Customize `LANGUAGE` in `jsons.py` (based on your audiobook language)
 2. Customize `ALLOWED` character set in `pack.py`
+3. Customize `MODEL_ID` to a strong whisper model in `recognize.py` (based on your audiobook language)
 
 ## Credits
 
