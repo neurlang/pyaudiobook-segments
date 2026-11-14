@@ -1,7 +1,6 @@
 import json, subprocess, os, glob, re, sys, traceback
 import soundfile as sf
-
-MAX_DUR = 30.0
+from concurrent.futures import ThreadPoolExecutor, as_completed
 
 def clean(t: str) -> str:
     t = t.replace('\t', ' ').replace('\n', ' ').replace('\r', ' ')
@@ -12,6 +11,13 @@ def process(json_path: str) -> int:
     audio = json_path[:-5]
     if not os.path.isfile(audio):
         raise FileNotFoundError(f"missing audio for {json_path}: {audio}")
+    textfile = audio + '.txt'
+    if not os.path.isfile(textfile):
+        raise FileNotFoundError(f"missing textfile for {json_path}: {textfile}")
+    with open(textfile, encoding='utf-8') as text_file:
+        text_file_content = text_file.read().replace("\n\r", ' ').replace("\n", ' ')
+    while '  ' in text_file_content:
+        text_file_content = text_file_content.replace('  ', ' ')
     stem = os.path.splitext(audio)[0].replace(' ', '_')
     data = json.load(open(json_path, encoding='utf-8'))
 
@@ -29,8 +35,9 @@ def process(json_path: str) -> int:
         kept.append({'start': start, 'end': end, 'text': text})
 
     # ---- 2. padded cut points ----
-    rows, i, skipped_long = [], 0, 0
+    rows, i = [], 0
     n = len(kept)
+    txt = ''
     for idx, seg in enumerate(kept):
         prev_seg = kept[idx - 1] if idx > 0     else None
         next_seg = kept[idx + 1] if idx < n - 1 else None
@@ -49,9 +56,8 @@ def process(json_path: str) -> int:
         cut_start = max(0.0, min(cut_start, file_dur))
         cut_end   = max(0.0, min(cut_end,   file_dur))
 
-        if cut_end - cut_start > MAX_DUR:
-            skipped_long += 1
-            continue
+        txt += seg['text']
+
         if cut_end - cut_start < 0.05:
             continue
 
@@ -64,24 +70,40 @@ def process(json_path: str) -> int:
             '-ar', '16000', '-ac', '1',
             '-c:a', 'flac', out
         ], check=True)
-        rows.append(f"{out}\t{seg['text']}")
+
+        pos = text_file_content.find(txt)
+        if pos > 0 and pos < len(text_file_content):
+            text_file_content = text_file_content[pos+len(txt):]
+        if cut_end == file_dur:
+            txt += text_file_content
+
+        rows.append(f"{out}\t{txt}")
+        txt = ''
 
     tsv = f"{stem}.tsv"
     with open(tsv, 'w', encoding='utf-8') as f:
         f.write('\n'.join(rows) + '\n')
-    if skipped_long:
-        print(f"     ({skipped_long} padded slices > {MAX_DUR}s skipped)")
     return len(rows)
 
-total_ok = total_fail = 0
-for jf in sorted(glob.glob('*.json')):
+def run_one(jf):
     try:
-        n = process(jf)
-        total_ok += 1
-        print(f"OK   {jf}: {n} segments")
-    except Exception as e:
-        total_fail += 1
-        print(f"FAIL {jf}: {e}")
-        traceback.print_exc()
+        return jf, process(jf), None
+    except Exception:
+        return jf, None, traceback.format_exc()
+
+files = sorted(glob.glob('*.json'))
+total_ok = total_fail = 0
+
+with ThreadPoolExecutor(max_workers=16) as ex:
+    futures = [ex.submit(run_one, jf) for jf in files]
+    for fut in as_completed(futures):
+        jf, n, err = fut.result()
+        if err is None:
+            total_ok += 1
+            print(f"OK   {jf}: {n} segments")
+        else:
+            total_fail += 1
+            print(f"FAIL {jf}: {err.strip().splitlines()[-1]}")
+            print(err)
 
 print(f"\nDone: {total_ok} ok, {total_fail} failed")

@@ -35,7 +35,7 @@ def load_tsv(path):
 def collect():
     train_rows, dev_rows = [], []
     stats = {"total": 0, "bad_text": 0, "too_long": 0, "missing": 0, "kept": 0}
-    for tsv in sorted(glob.glob('*.tsv')):
+    for tsv in sorted(glob.glob('*.fixed.tsv')):
         src_stem = os.path.splitext(tsv)[0]          # "01 Uvod"
         bucket = dev_rows if is_dev(src_stem) else train_rows
         for fname, text in load_tsv(tsv):
